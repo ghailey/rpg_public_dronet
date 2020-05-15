@@ -1,11 +1,11 @@
 import keras
 from keras.models import Model
-from keras.layers import Dense, Dropout, Activation, Flatten, Input,Concatenate
+from keras.layers import Dense, Dropout, Activation, Flatten, Input,Concatenate,Lambda
 from keras.layers import Conv2D, MaxPooling2D,DepthwiseConv2D
 from keras.layers.merge import add
 from keras import regularizers
 
-
+from keras import backend as K
 def channel_shuffle(x):
     height, width, channels = x.shape.as_list()[1:]
     channels_per_split = channels // 2
@@ -102,18 +102,28 @@ def resnet8(img_width, img_height, img_channels, output_dim):
     x5 = keras.layers.normalization.BatchNormalization()(x5)
     x5 = Activation('relu')(x5)
 
-    x7 = add([x6,x5])
+    x7 = Concatenate(axis=-1)([x6,x5])
     x7 = Lambda(channel_shuffle)(x7)
-
-    x = Flatten()(x7)
-    x = Activation('relu')(x)
-    x = Dropout(0.5)(x)
+    #x7 = Conv2D(256,(3,3),strides=[1,1], padding='same')(x7)
+    #x7 = Conv2D(256,(3,3),strides=[1,1], padding='same')(x7)
+    x7 = Conv2D(256,(3,3),strides=[1,1], padding='same')(x7)
+    x7 = keras.layers.normalization.BatchNormalization()(x7)
+    x7 = Activation('relu')(x7)
+    x9 = Conv2D(128,(3,3),strides=[1,1], padding='same')(x7)
+    x9 = Flatten()(x9)
+    x9 = Activation('relu')(x9)
+    x9 = Dropout(0.5)(x9)
 
     # Steering channel
-    steer = Dense(output_dim)(x)
+    steer = Dense(output_dim)(x9)
+    #steer = Activation('tanh')(steer)
+    x10 = Conv2D(128,(3,3),strides=[1,1], padding='same')(x7)
+    x10 = Flatten()(x10)
+    x10 = Activation('relu')(x10)
+    x10 = Dropout(0.5)(x10)
 
     # Collision channel
-    coll = Dense(output_dim)(x)
+    coll = Dense(output_dim)(x10)
     coll = Activation('sigmoid')(coll)
 
     # Define steering-collision model
